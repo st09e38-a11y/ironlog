@@ -772,6 +772,16 @@
     save();
   }
 
+  // ホーム画面への追加の案内を閉じた記録。閉じたあとは記録画面に出さない
+  function dismissInstall() {
+    state.meta.installDismissedAt = new Date().toISOString();
+    save();
+  }
+
+  function installDismissedAt() {
+    return state.meta.installDismissedAt || null;
+  }
+
   // 最後の書き出し以降に記録されたセッションの件数。
   // 書き出しの必要性を、日数ではなく「失う量」で示すために使う
   function unexportedSessions() {
@@ -859,6 +869,8 @@
     persistenceGranted: persistenceGranted,
     persistAsked: persistAsked,
     markPersistAsked: markPersistAsked,
+    dismissInstall: dismissInstall,
+    installDismissedAt: installDismissedAt,
     unexportedSessions: unexportedSessions,
     daysSinceExport: daysSinceExport,
     backupDue: backupDue,

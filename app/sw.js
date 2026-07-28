@@ -4,7 +4,7 @@
  * アプリを更新したら必ずこの名前を上げること。
  * 上げ忘れると、すでに開いたことのある利用者には古い版が配られ続ける。
  */
-var CACHE = 'ironlog-v3';
+var CACHE = 'ironlog-v4';
 
 var ASSETS = [
   './',

@@ -74,7 +74,8 @@
         '<button class="primary" data-act="pick-exercise">種目を追加</button>' +
       '</div>' + routineHTML;
 
-    return head + actions + body + bodyLogCard(date) + memoCard(session);
+    // 追加の案内は記録の下に置く。記録操作より上に割り込ませない（原則1）
+    return head + actions + body + installCardHTML() + bodyLogCard(date) + memoCard(session);
   }
 
   function summaryHTML(vol, sets, exCount) {
@@ -475,15 +476,20 @@
         ? '未取得'
         : '判定できません';
 
-    var standalone = global.matchMedia && matchMedia('(display-mode: standalone)').matches
-      || global.navigator.standalone === true;
-    var isIOS = /iPad|iPhone|iPod/.test(global.navigator.userAgent);
-
-    var addHome = (!standalone && isIOS)
-      ? '<p class="note">iPhone・iPad では、この画面を開かない期間が続くと' +
-        'ブラウザが記録を自動で削除することがあります。' +
-        '共有メニューから「ホーム画面に追加」しておくと、その対象から外れます。</p>'
-      : '';
+    /*
+     * ホーム画面への追加は保全策の一つ。設定からはいつでも辿れるようにする。
+     * 記録画面の案内を閉じたあとの受け皿でもある
+     */
+    var addHome = isStandalone()
+      ? '<p class="note">ホーム画面から開いています。記録は自動削除の対象外です。</p>'
+      : installEvent
+        ? '<p class="note">ホーム画面に追加すると、アイコンから全画面で開けるようになり、記録が消えにくくなります。</p>' +
+          '<div class="row-actions"><button data-act="install-app">ホーム画面に追加</button></div>'
+        : isIOS()
+          ? '<p class="note">iPhone・iPad では、この画面を開かない期間が続くと' +
+            'ブラウザが記録を自動で削除することがあります。' +
+            '共有ボタン（□に↑）から「ホーム画面に追加」しておくと、その対象から外れます。</p>'
+          : '';
 
     var keep = '<section class="card">' +
       '<div class="card-head"><h3>記録の保全</h3></div>' +
@@ -933,6 +939,63 @@
    * 「元に戻す」が消えてしまう。
    */
   /*
+   * --- ホーム画面への追加 -------------------------------------------------
+   *
+   * 追加された状態で使ってもらうことは、見た目の問題ではなく記録の保全策である。
+   * iOS では、追加しておくと一定期間開かなかった場合の自動削除の対象から外れる。
+   *
+   * ただし記録の妨げにはしない（原則1）。
+   * 案内を出すのは、1件でも記録が入っている日だけとする。
+   * 何も記録していない利用者に追加を勧めても、判断の材料がない。
+   */
+  var installEvent = null;
+
+  function isStandalone() {
+    return (global.matchMedia && matchMedia('(display-mode: standalone)').matches)
+      || global.navigator.standalone === true;
+  }
+
+  function isIOS() {
+    return /iPad|iPhone|iPod/.test(global.navigator.userAgent);
+  }
+
+  // 案内を出せる状態か。出せない環境（対応していないブラウザ）では何も出さない
+  function canOfferInstall() {
+    return !isStandalone() && (!!installEvent || isIOS());
+  }
+
+  function installDismissed() {
+    return !!S.installDismissedAt();
+  }
+
+  function installCardHTML() {
+    if (!canOfferInstall() || installDismissed()) return '';
+    // 記録が1件も無いうちは出さない
+    var s = S.sessionByDate(ui.date);
+    var has = s && s.entries.some(function (en) {
+      return en.sets.some(function (x) { return x.done; });
+    });
+    if (!has) return '';
+
+    var how = installEvent
+      ? '<div class="row-actions">' +
+          '<button class="primary" data-act="install-app">ホーム画面に追加</button>' +
+          '<button data-act="install-dismiss">あとで</button>' +
+        '</div>'
+      : '<p class="note">共有ボタン（□に↑）を押して、「ホーム画面に追加」を選んでください。</p>' +
+        '<div class="row-actions"><button data-act="install-dismiss">閉じる</button></div>';
+
+    return '<section class="card">' +
+      '<div class="card-head"><h3>ホーム画面に追加すると記録が守られます</h3></div>' +
+      '<p class="note">' +
+      (isIOS()
+        ? 'iPhone・iPadでは、しばらく開かない期間が続くとブラウザが記録を自動で削除することがあります。ホーム画面に追加しておくと、その対象から外れます。'
+        : 'アイコンから全画面で開けるようになり、記録が消えにくくなります。') +
+      '</p>' + how +
+      '</section>';
+  }
+
+  /*
    * 保存領域の永続化を一度だけ要求する。
    * 付与されると、端末の容量不足による追い出しや、
    * 一定期間開かなかったサイトの自動削除の対象から外れる。
@@ -1305,6 +1368,26 @@
       toast('書き出しました');
       if (ui.tab === 'settings') render();
     },
+    'install-app': function () {
+      if (!installEvent) return;
+      var ev = installEvent;
+      installEvent = null;
+      ev.prompt();
+      ev.userChoice.then(function (res) {
+        if (res && res.outcome === 'accepted') {
+          note('ホーム画面に追加しました');
+        } else {
+          // 断られた場合は繰り返し出さない
+          S.dismissInstall();
+        }
+        render();
+      })['catch'](function () { render(); });
+    },
+    'install-dismiss': function () {
+      S.dismissInstall();
+      render();
+      note('設定画面からいつでも追加できます');
+    },
     'request-persist': function () {
       S.requestPersistence().then(function (ok) {
         persistState = ok;
@@ -1528,6 +1611,20 @@
       if (document.visibilityState === 'hidden') S.flush();
     });
     window.addEventListener('pagehide', function () { S.flush(); });
+
+    /*
+     * ブラウザが「追加できる」と判断した時点で通知してくる。
+     * 既定の案内は抑止し、こちら側の都合の良い場所で出す。
+     */
+    global.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      installEvent = e;
+      render();
+    });
+    global.addEventListener('appinstalled', function () {
+      installEvent = null;
+      render();
+    });
 
     applyTheme();
     renderRestBar();
