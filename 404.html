@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iron Log — 端末内だけで完結する筋トレ記録</title>
+<meta name="description" content="アカウント登録なし、通信なし、インストールなし。ブラウザだけで動く筋トレ記録アプリ。記録はすべて端末の中に置かれます。">
+</head>
+<body>
+<style>
+  /*
+   * 地は「紙」。アプリ本体が暗いため、暗い画面写真が紙の上の物として立つ。
+   * 色はアプリから採る。朱はアプリのアクセント、緑はアプリの「済」。
+   * 朱は誘導だけに使い、事実の提示には緑を使って役割を分ける。
+   */
+  :root {
+    --paper:    #ECEFEE;
+    --card:     #F6F8F7;
+    --ink:      #131719;
+    --ink-2:    #47525622;
+    --zinc:     #5C686C;
+    --rule:     #C8D0CE;
+    --rule-2:   #DDE3E1;
+    --vermilion:#D6483C;
+    --verdigris:#1F7D50;
+    --iron:     #0E1113;
+
+    --measure: 34rem;
+    --gap: clamp(1rem, 4vw, 1.75rem);
+
+    --sans: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Hiragino Sans",
+            "Yu Gothic", "Noto Sans JP", "Helvetica Neue", Arial, sans-serif;
+
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:    #0E1113;
+      --card:     #171C1F;
+      --ink:      #E7ECEA;
+      --ink-2:    #8A949B22;
+      --zinc:     #97A2A6;
+      --rule:     #2B3337;
+      --rule-2:   #222A2D;
+      --vermilion:#F26A5D;
+      --verdigris:#4FC98A;
+      color-scheme: dark;
+    }
+  }
+
+  /* 閲覧側の切替は媒体設定より優先する */
+  :root[data-theme="dark"] {
+    --paper:    #0E1113;
+    --card:     #171C1F;
+    --ink:      #E7ECEA;
+    --ink-2:    #8A949B22;
+    --zinc:     #97A2A6;
+    --rule:     #2B3337;
+    --rule-2:   #222A2D;
+    --vermilion:#F26A5D;
+    --verdigris:#4FC98A;
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --paper:    #ECEFEE;
+    --card:     #F6F8F7;
+    --ink:      #131719;
+    --ink-2:    #47525622;
+    --zinc:     #5C686C;
+    --rule:     #C8D0CE;
+    --rule-2:   #DDE3E1;
+    --vermilion:#D6483C;
+    --verdigris:#1F7D50;
+    color-scheme: light;
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.9;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  .wrap {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 0 var(--gap);
+  }
+
+  section { border-top: 1px solid var(--rule); }
+  section:first-of-type { border-top: 0; }
+
+  /* ---- 見出し ---- */
+
+  .eyebrow {
+    font-size: 0.6875rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--zinc);
+    font-weight: 700;
+    margin: 0;
+  }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  h1 {
+    font-size: clamp(2.6rem, 12vw, 3.9rem);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 0.95;
+  }
+
+  h2 {
+    font-size: clamp(1.35rem, 5.5vw, 1.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.4;
+  }
+
+  h3 {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.6;
+  }
+
+  p { margin: 0; }
+  .lede { font-size: 1.0625rem; color: var(--ink); }
+  .note { color: var(--zinc); font-size: 0.9375rem; line-height: 1.85; }
+
+  /* ---- ヒーロー ---- */
+
+  .hero { padding: clamp(3rem, 12vw, 5rem) 0 2.5rem; }
+  .hero .stack { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .mark {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .mark .v {
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--zinc);
+    font-weight: 700;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 0.1rem 0.45rem;
+    line-height: 1.6;
+  }
+
+  .hero .lede { max-width: 30rem; }
+
+  /* 4つのゼロ。この頁で強く出すのはここ一箇所に絞る */
+  .zeros {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+  }
+  .zeros div {
+    padding: 0.85rem 0 0.9rem;
+    border-left: 1px solid var(--rule-2);
+    text-align: center;
+  }
+  .zeros div:first-child { border-left: 0; text-align: left; }
+  .zeros b {
+    display: block;
+    font-size: clamp(2rem, 9vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.06em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--verdigris);
+  }
+  .zeros span {
+    display: block;
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    color: var(--zinc);
+    font-weight: 600;
+    margin-top: 0.35rem;
+    line-height: 1.5;
+  }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+
+  .btn {
+    display: inline-block;
+    padding: 0.85rem 1.5rem;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    letter-spacing: 0.01em;
+    border: 1px solid transparent;
+    transition: transform 0.12s ease, background-color 0.12s ease;
+  }
+  .btn-primary { background: var(--vermilion); color: #fff; }
+  .btn-secondary { border-color: var(--rule); color: var(--ink); }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-secondary:hover { border-color: var(--ink); }
+  .btn:focus-visible,
+  a:focus-visible { outline: 2px solid var(--vermilion); outline-offset: 3px; }
+
+  /* ---- 画面紹介 ---- */
+
+  .screens { padding: 3rem 0 1rem; }
+  .screens > .wrap > .head { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 2.5rem; }
+
+  .shot {
+    display: grid;
+    gap: 1.25rem;
+    padding: 2rem 0;
+    border-top: 1px solid var(--rule-2);
+    align-items: start;
+  }
+  .shot:first-of-type { border-top: 0; padding-top: 0; }
+
+  .shot figure { margin: 0; }
+  .shot img {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    border-radius: 14px;
+    border: 1px solid var(--rule);
+    background: var(--iron);
+  }
+  .shot .text { display: flex; flex-direction: column; gap: 0.7rem; }
+
+  .tag {
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--vermilion);
+    font-weight: 700;
+  }
+
+  @media (min-width: 34rem) {
+    .shot { grid-template-columns: 300px 1fr; gap: 1.75rem; }
+    .shot img { max-width: 300px; }
+  }
+
+  /* PCでは本文の幅を少し広げる。狭い柱のまま置くと余白ばかりになる */
+  @media (min-width: 60rem) {
+    :root { --measure: 46rem; }
+    .shot { grid-template-columns: 320px 1fr; gap: 2.5rem; padding: 2.5rem 0; }
+    .shot img { max-width: 320px; }
+  }
+
+  /* ---- 台帳（原則・仕様） ---- */
+
+  .band { padding: 3rem 0; }
+  .band > .wrap > .head { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.75rem; }
+
+  .ledger { border-top: 2px solid var(--ink); }
+  .ledger .row {
+    display: grid;
+    gap: 0.15rem 1.25rem;
+    padding: 0.95rem 0;
+    border-bottom: 1px solid var(--rule-2);
+  }
+  .ledger .row dt {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    letter-spacing: -0.005em;
+  }
+  .ledger .row dd {
+    margin: 0;
+    color: var(--zinc);
+    font-size: 0.9375rem;
+    line-height: 1.8;
+  }
+  .ledger .row dd.num { font-variant-numeric: tabular-nums; }
+
+  @media (min-width: 30rem) {
+    .ledger .row { grid-template-columns: 11rem 1fr; align-items: baseline; }
+  }
+
+  dl { margin: 0; }
+
+  /* ---- データの扱い ---- */
+
+  /* 台帳の罫に合わせる。囲みは作らず、上に太い罫を引いて区切る */
+  .claim {
+    border-top: 2px solid var(--verdigris);
+    padding: 1.1rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .claim h3 { color: var(--verdigris); }
+  .claim .seal {
+    align-self: flex-start;
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+    color: var(--verdigris);
+    border: 1px solid var(--verdigris);
+    border-radius: 2px;
+    padding: 0.1rem 0.5rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .faq { display: flex; flex-direction: column; }
+  .faq details {
+    border-bottom: 1px solid var(--rule-2);
+    padding: 0.35rem 0;
+  }
+  .faq summary {
+    cursor: pointer;
+    padding: 0.75rem 0;
+    font-weight: 700;
+    font-size: 0.9375rem;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: baseline;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after {
+    content: "＋";
+    color: var(--zinc);
+    font-weight: 400;
+    flex: none;
+  }
+  .faq details[open] summary::after { content: "－"; }
+  .faq details p { padding: 0 0 0.9rem; color: var(--zinc); font-size: 0.9375rem; }
+
+  /* ---- 末尾 ---- */
+
+  .close { padding: 3.5rem 0; }
+  .close .wrap { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding: 2rem 0 3rem;
+    color: var(--zinc);
+    font-size: 0.875rem;
+  }
+  footer .wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+  footer a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<section class="hero">
+  <div class="wrap stack">
+    <div class="mark">
+      <h1>Iron&nbsp;Log</h1>
+      <span class="v">ブラウザ完結</span>
+    </div>
+
+    <p class="lede">
+      ジムで前回の重量を思い出せない、という一点だけを解く筋トレ記録です。
+      前回の数字を出しながら、今日のセットをその場で埋めていきます。
+      記録は端末の中にだけ置かれ、外へは出ません。
+    </p>
+
+    <div class="zeros">
+      <div><b>0</b><span>通信</span></div>
+      <div><b>0</b><span>アカウント</span></div>
+      <div><b>0</b><span>インストール</span></div>
+      <div><b>0</b><span>円</span></div>
+    </div>
+
+    <div class="actions">
+      <a class="btn btn-primary" href="app/">アプリを開く</a>
+      <a class="btn btn-secondary" href="#screens">画面を見る</a>
+    </div>
+
+    <p class="note">
+      開いた時点で使えます。登録画面はありません。
+      閉じても記録は残り、次に開くと同じ状態から続きます。
+    </p>
+  </div>
+</section>
+
+<section class="screens" id="screens">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">実際の画面</p>
+      <h2>4つの画面だけで動きます</h2>
+      <p class="note">
+        以下はすべて動作中のアプリの画面です。数字はデモ用の記録で、加工はしていません。
+      </p>
+    </div>
+
+    <div class="shot">
+      <figure><img src="shots/webp/01_record.webp" width="640" height="1313" alt="記録画面。ベンチプレスのセットが並び、前回の記録が種目名の下に表示されている" loading="lazy"></figure>
+      <div class="text">
+        <p class="tag">記録</p>
+        <h3>前回の重量が、入力欄のすぐ上にある</h3>
+        <p class="note">
+          種目を追加すると、前回の本番セットが初期値として入ります。
+          その場で直して「済」を押すだけで1セット終わります。
+          自己ベストを更新したセットには印が付きます。
+          保存ボタンはありません。入力した時点で残ります。
+        </p>
+      </div>
+    </div>
+
+    <div class="shot">
+      <figure><img src="shots/webp/04_picker_bodyweight.webp" width="640" height="1313" alt="種目を選ぶ画面。部位のチップと器具のチップで絞り込んでおり、自重で絞った一覧が表示されている" loading="lazy"></figure>
+      <div class="text">
+        <p class="tag">種目を選ぶ</p>
+        <h3>部位と器具、2つの軸で絞る</h3>
+        <p class="note">
+          57種目を用意しています。部位（胸・背中・脚・肩・腕・体幹・有酸素）とは別に、
+          器具（自重・フリーウェイト・マシン・その他）の軸を持たせました。
+          自重スクワットとバーベルスクワットが一覧で混ざらないようにするためです。
+          足りない種目は自分で追加できます。
+        </p>
+      </div>
+    </div>
+
+    <div class="shot">
+      <figure><img src="shots/webp/05_history.webp" width="640" height="1313" alt="履歴画面。月次カレンダーに実施日が色付きで示され、実施日数・月間ボリューム・連続週が上に並ぶ" loading="lazy"></figure>
+      <div class="text">
+        <p class="tag">履歴</p>
+        <h3>やった日と、鍛えた部位が一目で分かる</h3>
+        <p class="note">
+          カレンダーの実施日には、その日に含まれる部位の色が付きます。
+          脚だけ空いている、といった偏りがそのまま見えます。
+          日付を選ぶと、その日の種目とセット内容を開けます。
+        </p>
+      </div>
+    </div>
+
+    <div class="shot">
+      <figure><img src="shots/webp/08_analysis_1rm.webp" width="640" height="1313" alt="分析画面。推定1RMの推移が折れ線で右肩上がりに描かれ、その下に種目別の自己ベストが並ぶ" loading="lazy"></figure>
+      <div class="text">
+        <p class="tag">分析</p>
+        <h3>伸びているのか、止まっているのか</h3>
+        <p class="note">
+          推定1RMの推移、週次ボリューム、部位別の構成比、自己ベストを見られます。
+          推定にはEpley式を使い、計算式そのものを画面に書いています。
+          12回を超えるセットは推定から外しています。式の当てはまりが悪くなるためです。
+        </p>
+      </div>
+    </div>
+
+    <div class="shot">
+      <figure><img src="shots/webp/07_analysis.webp" width="640" height="1313" alt="分析画面の上部。週次ボリュームの棒グラフと、部位別ボリュームの構成比" loading="lazy"></figure>
+      <div class="text">
+        <p class="tag">分析</p>
+        <h3>グラフも端末の中で描いています</h3>
+        <p class="note">
+          グラフ描画のライブラリは使っていません。SVGを自前で組み立てています。
+          外部から読み込むものが1つも無い状態を保つためです。
+          記録が0件のときは、空の目盛りではなく「データがありません」と出します。
+        </p>
+      </div>
+    </div>
+
+    <div class="shot">
+      <figure><img src="shots/webp/10_settings.webp" width="640" height="1313" alt="設定画面。テーマ、休憩時間、タイマーの自動開始、マスタ管理、JSONの書き出しと読み込み" loading="lazy"></figure>
+      <div class="text">
+        <p class="tag">設定</p>
+        <h3>持ち出しはJSON、置いていくものは何もない</h3>
+        <p class="note">
+          全記録をJSONで書き出せます。機種を変えるときは、書き出して新しい端末で読み込みます。
+          読み込みは中身を検証してから、置き換えるか追加するかを選べます。
+          サーバーに預けていないので、こちらから取り出せなくなることがありません。
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">データの扱い</p>
+      <h2>通信ゼロというのは、比喩ではありません</h2>
+    </div>
+
+    <div class="claim">
+      <span class="seal">検証済み 外部リクエスト 0件</span>
+      <h3>解析も広告もフォントも、読み込んでいません</h3>
+      <p class="note">
+        解析ツール、広告、フォント、CDN、クラッシュ報告を含め、外部ドメインへのリクエストを一切行いません。
+        自動検証を回すたびに、外部あてのリクエストが0件であることを確認しています。
+        機内モードのままでも、通常どおり動きます。
+      </p>
+    </div>
+
+    <div style="height:2rem"></div>
+
+    <dl class="ledger">
+      <div class="row">
+        <dt>保存先</dt>
+        <dd>使っているブラウザの localStorage。端末の中だけです</dd>
+      </div>
+      <div class="row">
+        <dt>取り出し</dt>
+        <dd>JSONで書き出し、読み込み。形式は公開しています</dd>
+      </div>
+      <div class="row">
+        <dt>消える条件</dt>
+        <dd>ブラウザのサイトデータを消したとき。定期的な書き出しをおすすめします</dd>
+      </div>
+      <div class="row">
+        <dt>共有・同期</dt>
+        <dd class="num">ありません。1台で使う前提です</dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">つくりの方針</p>
+      <h2>トレーニング中は、片手と数秒しかない</h2>
+      <p class="note">
+        セットの合間に操作するものなので、以下を仕様より上位の判断基準にしています。
+        仕様がこれに反するときは、仕様のほうを直しています。
+      </p>
+    </div>
+
+    <dl class="ledger">
+      <div class="row">
+        <dt>記録を妨げない</dt>
+        <dd>入力までの手数を増やす機能は、分析側の都合であっても入れません</dd>
+      </div>
+      <div class="row">
+        <dt>勝手に始めない</dt>
+        <dd>休憩タイマーの自動開始は初期状態でオフです。押したときだけ動きます</dd>
+      </div>
+      <div class="row">
+        <dt>入力を失わない</dt>
+        <dd>保存操作を求めません。書いた時点で残ります</dd>
+      </div>
+      <div class="row">
+        <dt>退路を用意する</dt>
+        <dd>消える操作には、取り消しか確認のどちらかを必ず付けています</dd>
+      </div>
+      <div class="row">
+        <dt>常時使うものは常に見せる</dt>
+        <dd>休憩タイマーは画面下に出したままにしています。動くことと、見つかることは別なので</dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">よくある質問</p>
+      <h2>先に答えておきます</h2>
+    </div>
+
+    <div class="faq">
+      <details>
+        <summary>本当に無料ですか</summary>
+        <p>無料です。有料版も、上限も、広告もありません。将来にわたって課金を入れる予定はありません。</p>
+      </details>
+      <details>
+        <summary>インストールは要りますか</summary>
+        <p>要りません。ブラウザで開けば使えます。ホーム画面に追加すると、アプリのように全画面で開き、圏外でも起動します。</p>
+      </details>
+      <details>
+        <summary>機種を変えるときは</summary>
+        <p>設定画面からJSONで書き出し、新しい端末で読み込みます。読み込むときに、置き換えるか既存に追加するかを選べます。</p>
+      </details>
+      <details>
+        <summary>パソコンでも使えますか</summary>
+        <p>使えます。画面幅320px以上に対応しています。ただし入力はスマートフォンでの片手操作を前提に組んでいます。</p>
+      </details>
+      <details>
+        <summary>重量の単位をポンドにできますか</summary>
+        <p>できません。kg固定です。表示だけを切り替えると保存してある値と単位が食い違い、過去の記録の読み方を誤らせるためです。換算まで含めて対応できるまでは出しません。</p>
+      </details>
+      <details>
+        <summary>動作するブラウザは</summary>
+        <p>Safari 16以降、Chrome・Firefox・Edge は110以降です。</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="close">
+  <div class="wrap">
+    <h2>開くところから始められます</h2>
+    <p class="note">
+      登録も、初期設定も要りません。種目を1つ選んで、重さと回数を入れるところからです。
+    </p>
+    <div class="actions">
+      <a class="btn btn-primary" href="app/">アプリを開く</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Iron Log — 端末内だけで完結する筋トレ記録</p>
+    <p>つくった経緯と設計の判断は <a href="https://note.com/pine_mountain_jp">note</a> に書いています。</p>
+  </div>
+</footer>
+</body>
+</html>
