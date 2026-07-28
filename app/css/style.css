@@ -813,6 +813,7 @@ a { color: var(--accent); }
   align-items: center;
   justify-content: center;
   gap: 2px;
+  position: relative;
   font-size: 11px;
   color: var(--muted);
 }
@@ -1202,4 +1203,50 @@ body.undo-open .note-toast {
   }
   .tabbar { max-width: 620px; margin: 0 auto; }
   .rest { max-width: 620px; margin: 0 auto; }
+}
+
+/* ---- 記録の保全 ---- */
+
+/*
+ * 書き出しが滞っていることを示す印。
+ * タブに小さく出すだけにする。記録中に割り込むと原則1に反するため。
+ */
+.tabbar button.badge::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  margin-left: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* 設定画面に出す、書き出しを促す枠 */
+.alert {
+  margin: 8px 12px 4px;
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.alert p {
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.alert p.note {
+  margin-top: 6px;
+  font-weight: 400;
+  padding: 0;
+}
+
+.alert .row-actions {
+  margin-top: 10px;
+  padding: 0;
 }

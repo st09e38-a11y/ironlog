@@ -721,6 +721,88 @@
     }
   }
 
+  /*
+   * --- 記録を失わせないための仕組み ---------------------------------------
+   *
+   * localStorage は永続保存ではない。次の経路で消える。
+   *
+   *   1. 利用者がサイトデータを削除した
+   *   2. iOS Safari が、一定期間そのサイトを開かなかったサイトの
+   *      スクリプト書き込み領域を削除した
+   *   3. 端末の空き容量が減り、ブラウザが古いサイトのデータを追い出した
+   *   4. プライベートブラウズだった
+   *
+   * 2 が最も危ない。数週間トレーニングを休んだだけで消えるためである。
+   * 対策は次の3段構えとする。通信を伴うものは採らない（原則4）。
+   *
+   *   a. 永続化を要求する（persist）。付与されると 2 と 3 の対象から外れる
+   *   b. ホーム画面に追加してもらう。iOS では 2 の対象から外れる
+   *   c. 書き出しを促す。1 と 4 はアプリ側では防げないため、退避手段を持たせる
+   */
+
+  // ブラウザに永続化を要求する。付与の判断はブラウザ側が行う。
+  // Chrome は利用実績から自動で判断し、Firefox は利用者に確認する。
+  // Safari はホーム画面に追加されている場合に付与する。
+  function requestPersistence() {
+    if (!global.navigator || !navigator.storage || !navigator.storage.persist) {
+      return Promise.resolve(false);
+    }
+    return navigator.storage.persist().then(function (ok) {
+      return !!ok;
+    })['catch'](function () { return false; });
+  }
+
+  function persistenceGranted() {
+    if (!global.navigator || !navigator.storage || !navigator.storage.persisted) {
+      return Promise.resolve(null); // 判定できない
+    }
+    return navigator.storage.persisted().then(function (ok) {
+      return !!ok;
+    })['catch'](function () { return null; });
+  }
+
+  // 永続化の自動要求は一度だけにする。
+  // 毎回聞くと、確認を出すブラウザで煩わしくなる（原則2）
+  function persistAsked() {
+    return !!state.meta.persistAskedAt;
+  }
+
+  function markPersistAsked() {
+    state.meta.persistAskedAt = new Date().toISOString();
+    save();
+  }
+
+  // 最後の書き出し以降に記録されたセッションの件数。
+  // 書き出しの必要性を、日数ではなく「失う量」で示すために使う
+  function unexportedSessions() {
+    var last = state.meta.lastExportedAt;
+    var withRecord = state.sessions.filter(function (s) {
+      return s.entries.some(function (en) {
+        return en.sets.some(function (x) { return x.done && !x.warmup; });
+      }) || s.memo || s.condition;
+    });
+    if (!last) return withRecord.length;
+    var lastDate = last.slice(0, 10);
+    return withRecord.filter(function (s) { return s.date > lastDate; }).length;
+  }
+
+  function daysSinceExport() {
+    var last = state.meta.lastExportedAt;
+    if (!last) return null;
+    return Math.floor((Date.now() - new Date(last).getTime()) / 86400000);
+  }
+
+  /*
+   * 書き出しを促すかどうか。
+   * 記録が数件しかないうちは促さない。促す価値より煩わしさが勝るため。
+   */
+  function backupDue() {
+    var n = unexportedSessions();
+    if (n < 5) return false;
+    var d = daysSinceExport();
+    return d === null || d >= 14;
+  }
+
   function onEvent(fn) {
     listeners.push(fn);
   }
@@ -773,6 +855,13 @@
     exportCSV: exportCSV,
     clearAll: clearAll,
     usageBytes: usageBytes,
+    requestPersistence: requestPersistence,
+    persistenceGranted: persistenceGranted,
+    persistAsked: persistAsked,
+    markPersistAsked: markPersistAsked,
+    unexportedSessions: unexportedSessions,
+    daysSinceExport: daysSinceExport,
+    backupDue: backupDue,
     onEvent: onEvent
   };
 })(window);

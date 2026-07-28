@@ -451,15 +451,63 @@
         '<button data-act="manage-mysets">マイセットを管理</button>' +
       '</div></section>';
 
+    /*
+     * 記録の保全。
+     * localStorage は永続保存ではないため、状態を隠さずに示し、
+     * 利用者が取れる手を並べる。曖昧に「おすすめします」とだけ書くと、
+     * 消えたときに何もしていなかったことになる。
+     */
+    var unexported = S.unexportedSessions();
+    var due = S.backupDue();
+
+    var backup = due
+      ? '<div class="alert">' +
+          '<p>書き出していない記録が' + unexported + '日ぶんあります</p>' +
+          '<p class="note">端末のデータが消えると、この記録は戻せません。' +
+          'ファイルに書き出して、クラウドやパソコンに置いておいてください。</p>' +
+          '<div class="row-actions"><button class="primary" data-act="export-json">いま書き出す</button></div>' +
+        '</div>'
+      : '';
+
+    var persistLabel = persistState === true
+      ? '有効（自動削除の対象外）'
+      : persistState === false
+        ? '未取得'
+        : '判定できません';
+
+    var standalone = global.matchMedia && matchMedia('(display-mode: standalone)').matches
+      || global.navigator.standalone === true;
+    var isIOS = /iPad|iPhone|iPod/.test(global.navigator.userAgent);
+
+    var addHome = (!standalone && isIOS)
+      ? '<p class="note">iPhone・iPad では、この画面を開かない期間が続くと' +
+        'ブラウザが記録を自動で削除することがあります。' +
+        '共有メニューから「ホーム画面に追加」しておくと、その対象から外れます。</p>'
+      : '';
+
+    var keep = '<section class="card">' +
+      '<div class="card-head"><h3>記録の保全</h3></div>' +
+      backup +
+      '<p class="muted pad">保存容量 ' + (bytes / 1024).toFixed(1) + 'KB' +
+      ' ／ 最終書き出し ' + esc(exported) +
+      ' ／ 永続化 ' + esc(persistLabel) + '</p>' +
+      (persistState === false
+        ? '<div class="row-actions"><button data-act="request-persist">この端末に記録を残す</button></div>'
+        : '') +
+      addHome +
+      '<p class="note">記録はこの端末のブラウザの中だけにあります。外部には送っていません。' +
+      'そのため、ブラウザのデータを消去した場合や、プライベートブラウズで使っていた場合は戻せません。' +
+      '月に1回の書き出しをおすすめします。</p>' +
+      '</section>';
+
     var data = '<section class="card">' +
       '<div class="card-head"><h3>データ</h3></div>' +
-      '<p class="muted pad">保存容量 ' + (bytes / 1024).toFixed(1) + 'KB ／ 最終エクスポート ' + esc(exported) + '</p>' +
       '<div class="row-actions">' +
         '<button class="primary" data-act="export-json">JSONで書き出す</button>' +
         '<button data-act="import-json">JSONを読み込む</button>' +
         '<button data-act="export-csv">CSVで書き出す</button>' +
       '</div>' +
-      '<p class="note">記録はこの端末のブラウザ内にのみ保存されます。ブラウザのデータを消去すると失われるため、定期的な書き出しをおすすめします。</p>' +
+      '<p class="note">書き出したJSONは、別の端末で読み込めます。機種変更のときはこれを使います。</p>' +
       '<div class="row-actions"><button class="danger" data-act="clear-all">すべての記録を削除</button></div>' +
       '</section>';
 
@@ -489,7 +537,9 @@
       '<p class="pad"><a href="' + esc(D.AUTHOR_URL) + '" target="_blank" rel="noopener noreferrer">作者のnote</a></p>' +
       '</section>';
 
-    return display + manage + data + gear + about;
+    // 記録の保全は、書き出しが滞っているときは上に出す。
+    // 探しに行かないと気づけない位置に置くと、消えてから知ることになる（原則7）
+    return (due ? keep + display : display) + manage + (due ? '' : keep) + data + gear + about;
   }
 
   // =====================================================================
@@ -882,6 +932,44 @@
    * 同じ枠を使うと、取り消せるはずの操作の直後に別の通知が出ただけで
    * 「元に戻す」が消えてしまう。
    */
+  /*
+   * 保存領域の永続化を一度だけ要求する。
+   * 付与されると、端末の容量不足による追い出しや、
+   * 一定期間開かなかったサイトの自動削除の対象から外れる。
+   * 付与の判断はブラウザ側が行うため、失敗しても利用者には知らせない。
+   */
+  var persistState = null; // true / false / null（判定不能）
+
+  function askPersistenceOnce() {
+    if (S.persistAsked()) return;
+    S.markPersistAsked();
+    S.requestPersistence().then(function (ok) {
+      persistState = ok;
+      if (ui.tab === 'settings') render();
+    });
+  }
+
+  function refreshPersistState() {
+    S.persistenceGranted().then(function (v) {
+      if (v === persistState) return;
+      persistState = v;
+      if (ui.tab === 'settings') render();
+    });
+  }
+
+  // 設定タブに印を出すかどうか。書き出しが滞っている場合に付ける
+  function updateTabBadge() {
+    var b = document.querySelector('.tabbar button[data-tab="settings"]');
+    if (!b) return;
+    var due = S.backupDue();
+    b.classList.toggle('badge', due);
+    if (due) {
+      b.setAttribute('aria-label', '設定（書き出していない記録があります）');
+    } else {
+      b.removeAttribute('aria-label');
+    }
+  }
+
   function note(msg) {
     var el = $('#note');
     el.textContent = msg;
@@ -948,6 +1036,7 @@
       b.classList.toggle('on', on);
       b.setAttribute('aria-current', on ? 'page' : 'false');
     });
+    updateTabBadge();
     applyTheme();
   }
 
@@ -1133,6 +1222,10 @@
       if (next && S.get().settings.autoRest && !en.sets[i].warmup) {
         startRest(S.get().settings.restSeconds || 90);
       }
+      // 記録が実際に発生した時点で、保存領域の永続化を一度だけ要求する。
+      // 起動直後に要求すると、確認を出すブラウザでは
+      // まだ何もしていない利用者にいきなり許可を求めることになる（原則2）
+      if (next) askPersistenceOnce();
     },
 
     'cond': function (el) {
@@ -1211,6 +1304,15 @@
       download('ironlog_' + S.todayStr() + '.json', S.exportJSON());
       toast('書き出しました');
       if (ui.tab === 'settings') render();
+    },
+    'request-persist': function () {
+      S.requestPersistence().then(function (ok) {
+        persistState = ok;
+        note(ok
+          ? 'この端末に記録を残す設定にしました'
+          : 'ブラウザが許可しませんでした。書き出しでの保全をおすすめします');
+        if (ui.tab === 'settings') render();
+      });
     },
     'export-csv': function () {
       download('ironlog_' + S.todayStr() + '.csv', '﻿' + S.exportCSV(), 'text/csv');
@@ -1430,6 +1532,8 @@
     applyTheme();
     renderRestBar();
     render();
+    // 永続化の現状を調べる。要求はここでは行わない（原則2）
+    refreshPersistState();
 
     // 単一ファイル版には sw.js が同梱されないため登録しない
     if (!global.IL_SINGLE_FILE && 'serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
